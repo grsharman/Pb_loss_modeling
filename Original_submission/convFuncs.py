@@ -1,11 +1,7 @@
 '''
 Code for modeling apparent Pb loss distributions
 
-Accompanyment to "Modeling apparent Pb loss in
-zircon U-Pb Geochronology" submitted to Geochronology
-
-Revision 1 of geochron-2023-6, updated August 2023
-
+Accompanyment to "XYZ" submitted to Geochronology
 Glenn R. Sharman and Matthew A. Malkowski
 
 '''
@@ -27,9 +23,6 @@ from scipy.stats import halfnorm
 from scipy.stats import lognorm
 from scipy.stats import rv_discrete
 
-import scipy.stats as stats
-from scipy import special
-
 # Statistical tests
 from scipy.stats import kstest
 from astropy.stats import kuiper
@@ -40,25 +33,7 @@ from scipy.interpolate import interp1d
 from scipy.optimize import minimize
 from statsmodels.distributions.empirical_distribution import ECDF
 
-supported_dists = ['expon','gamma','pareto','uniform','weibull','rayleigh', 'gengamma', 'halfnorm', 'lognorm', 'logitnorm', 'constant', 'none', 'isolated']
-
-class logitnorm_gen(stats.rv_continuous):
-    # https://stackoverflow.com/questions/60669256/how-do-you-create-a-logit-normal-distribution-in-python
-
-    def _argcheck(self, m, s):
-        return (s > 0.) & (m > -np.inf)
-    
-    def _pdf(self, x, m, s):
-        return stats.norm(loc=m, scale=s).pdf(special.logit(x))/(x*(1-x))
-    
-    def _cdf(self, x, m, s):
-        return stats.norm(loc=m, scale=s).cdf(special.logit(x))
-    
-    def _rvs(self, m, s, size=None, random_state=None):
-        return special.expit(m + s*random_state.standard_normal(size))
-    
-    def fit(self, data, **kwargs):
-        return stats.norm.fit(special.logit(data), **kwargs)
+supported_dists = ['expon','gamma','pareto','uniform','weibull','rayleigh', 'gengamma', 'halfnorm', 'lognorm', 'constant', 'none', 'isolated']
 
 def Pb_loss_fun(params, dist_type, x):
     '''
@@ -117,12 +92,8 @@ def Pb_loss_fun(params, dist_type, x):
         Pb_loss_pct_pdf = halfnorm.pdf(x=-x, loc=0, scale=params[0])
     if dist_type == 'lognorm':
         Pb_loss_pct_pdf = lognorm.pdf(x=-x, loc=0, s=params[1], scale=params[0])
-    if dist_type == 'logitnorm':
-        logitnorm = logitnorm_gen(a=0.0, b=1.0, name='logitnom')
-        Pb_loss_pct_pdf = logitnorm.pdf(x=-x/100., m=params[0], s=params[1])
 
     Pb_loss_pct_pdf[np.isinf(Pb_loss_pct_pdf)] = 0 # To avoid values very close to x=0 that become infinite
-    Pb_loss_pct_pdf[np.isnan(Pb_loss_pct_pdf)] = 0 # To avoid nan values (e.g., logit-norm distribution at values of 0 and 1)
     Pb_loss_pct_pdf = Pb_loss_pct_pdf/np.sum(Pb_loss_pct_pdf)
 
     return Pb_loss_pct_pdf    
@@ -280,8 +251,7 @@ def misfit_poly(params_Pb_loss, dist_type, gmm_Ma_pdf, x, xage, dates_nonCA, met
     return misfit
 
 def plot_Pb_loss_model_approach_1(params_norm, params_Pb_loss, fit, dates_input, errors_1s_input, xage, x, xlim, xlim_Pb_loss, dist_type,
-    elinewidth=0.5, plot_ref_age=False, ref_age=None, ref_age_2s_uncert=None, dates_input_CA = None, errors_1s_input_CA = None,
-    label=''):
+    elinewidth=0.5, plot_ref_age=False, ref_age=None, ref_age_2s_uncert=None, dates_input_CA = None, errors_1s_input_CA = None):
 
     '''
     Function for plotting the a comparison of the model output with input data
@@ -356,75 +326,63 @@ def plot_Pb_loss_model_approach_1(params_norm, params_Pb_loss, fit, dates_input,
     ax.text(0.05, 0.70, '\u03C3 (Ma): '+str(np.round(params_norm[1],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
 
     if dist_type == 'none':
-        ax.text(0.05, 0.92, label+' model fit (none)', horizontalalignment='left', size='small', transform=ax.transAxes)
+        ax.text(0.05, 0.92, 'Model fit (none)', horizontalalignment='left', size='small', transform=ax.transAxes)
         ax.text(0.05, 0.85, 'fun: '+'{:.3f}'.format(float(fit)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
     if dist_type == 'constant':
-        ax.text(0.05, 0.92, label+' model fit (constant)', horizontalalignment='left', size='small', transform=ax.transAxes)
+        ax.text(0.05, 0.92, 'Model fit (constant)', horizontalalignment='left', size='small', transform=ax.transAxes)
         ax.text(0.05, 0.85, 'fun: '+'{:.3f}'.format(float(fit)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.65, '% shift: '+str(np.round(params_Pb_loss[0],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
     if dist_type == 'isolated':
-        ax.text(0.05, 0.92, label+' model fit (isolated)', horizontalalignment='left', size='small', transform=ax.transAxes)
+        ax.text(0.05, 0.92, 'Model fit (isolated)', horizontalalignment='left', size='small', transform=ax.transAxes)
         ax.text(0.05, 0.85, 'fun: '+'{:.3f}'.format(float(fit)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.65, '% shift: '+str(np.round(params_Pb_loss[0],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.60, '% of grains shifted: '+str(np.round(params_Pb_loss[1]*100,1)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
     if dist_type == 'expon':
-        ax.text(0.05, 0.92, label+' model fit (exponential)', horizontalalignment='left', size='small', transform=ax.transAxes)
+        ax.text(0.05, 0.92, 'Model fit (exponential)', horizontalalignment='left', size='small', transform=ax.transAxes)
         ax.text(0.05, 0.85, 'fun: '+'{:.3f}'.format(float(fit)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.65, 'shape: '+str(np.round(params_Pb_loss[0],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
     if dist_type == 'halfnorm':
-        ax.text(0.05, 0.92, label+' model fit (half norm)', horizontalalignment='left', size='small', transform=ax.transAxes)
+        ax.text(0.05, 0.92, 'Model fit (half norm)', horizontalalignment='left', size='small', transform=ax.transAxes)
         ax.text(0.05, 0.85, 'fun: '+'{:.3f}'.format(float(fit)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.65, 'scale: '+str(np.round(params_Pb_loss[0],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
     if dist_type == 'lognorm':
-        ax.text(0.05, 0.92, label+' model fit (lognorm)', horizontalalignment='left', size='small', transform=ax.transAxes)
+        ax.text(0.05, 0.92, 'Model fit (lognorm)', horizontalalignment='left', size='small', transform=ax.transAxes)
         ax.text(0.05, 0.85, 'fun: '+'{:.3f}'.format(float(fit)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.65, 'scale: '+str(np.round(params_Pb_loss[0],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.60, 'shape: '+str(np.round(params_Pb_loss[1],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
     if dist_type == 'rayleigh':
-        ax.text(0.05, 0.92, label+' model fit (Rayleigh)', horizontalalignment='left', size='small', transform=ax.transAxes)
+        ax.text(0.05, 0.92, 'Model fit (Rayleigh)', horizontalalignment='left', size='small', transform=ax.transAxes)
         ax.text(0.05, 0.85, 'fun: '+'{:.3f}'.format(float(fit)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.65, 'scale: '+str(np.round(params_Pb_loss[0],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
     if dist_type == 'weibull':
-        ax.text(0.05, 0.92, label+' model fit (weibull)', horizontalalignment='left', size='small', transform=ax.transAxes)
+        ax.text(0.05, 0.92, 'Model fit (weibull)', horizontalalignment='left', size='small', transform=ax.transAxes)
         ax.text(0.05, 0.85, 'fun: '+'{:.3f}'.format(float(fit)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.65, 'scale: '+str(np.round(params_Pb_loss[0],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.60, 'shape: '+str(np.round(params_Pb_loss[1],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
     if dist_type == 'pareto':
-        ax.text(0.05, 0.92, label+' model fit (pareto)', horizontalalignment='left', size='small', transform=ax.transAxes)
+        ax.text(0.05, 0.92, 'Model fit (pareto)', horizontalalignment='left', size='small', transform=ax.transAxes)
         ax.text(0.05, 0.85, 'fun: '+'{:.3f}'.format(float(fit)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.65, 'shape: '+str(np.round(params_Pb_loss[0],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
     if dist_type == 'uniform':
-        ax.text(0.05, 0.92, label+' model fit (uniform)', horizontalalignment='left', size='small', transform=ax.transAxes)
+        ax.text(0.05, 0.92, 'Model fit (uniform)', horizontalalignment='left', size='small', transform=ax.transAxes)
         ax.text(0.05, 0.85, 'fun: '+'{:.3f}'.format(float(fit)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.65, 'u (min): '+str(np.round(params_Pb_loss[0],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.60, 'u (max): '+str(np.round(params_Pb_loss[0]+params_Pb_loss[1],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
     if dist_type == 'gamma':
-        ax.text(0.05, 0.92, label+' model fit (gamma)', horizontalalignment='left', size='small', transform=ax.transAxes)
+        ax.text(0.05, 0.92, 'Model fit (gamma)', horizontalalignment='left', size='small', transform=ax.transAxes)
         ax.text(0.05, 0.85, 'fun: '+'{:.3f}'.format(float(fit)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.65, 'scale: '+str(np.round(params_Pb_loss[0],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.60, 'shape: '+str(np.round(params_Pb_loss[1],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)    
     if dist_type == 'gengamma':
-        ax.text(0.05, 0.92, label+' model fit (generalized gamma)', horizontalalignment='left', size='small', transform=ax.transAxes)
+        ax.text(0.05, 0.92, 'Model fit (generalized gamma)', horizontalalignment='left', size='small', transform=ax.transAxes)
         ax.text(0.05, 0.85, 'fun: '+'{:.3f}'.format(float(fit)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.65, 'scale: '+str(np.round(params_Pb_loss[0],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
         ax.text(0.05, 0.60, 'shape (a): '+str(np.round(params_Pb_loss[1],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)    
         ax.text(0.05, 0.55, 'shape (c): '+str(np.round(params_Pb_loss[2],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)    
-    if dist_type == 'logitnorm':
-        ax.text(0.05, 0.92, label+' model fit (logit-norm)', horizontalalignment='left', size='small', transform=ax.transAxes)
-        ax.text(0.05, 0.85, 'fun: '+'{:.3f}'.format(float(fit)), size='x-small', horizontalalignment='left', transform=ax.transAxes)
-        ax.text(0.05, 0.65, 'mu: '+str(np.round(params_Pb_loss[0],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)    
-        ax.text(0.05, 0.60, 'sigma: '+str(np.round(params_Pb_loss[1],2)), size='x-small', horizontalalignment='left', transform=ax.transAxes)    
 
-    if elinewidth > 0:
-        ax.text(0.0, -0.1, '2\u03C3 uncertainties shown', size='x-small', horizontalalignment='left', transform=ax.transAxes)
+    ax.text(0.025, 1.02, '2\u03C3 uncertainties shown', size='x-small', horizontalalignment='left', transform=ax.transAxes)
 
-    ax.set_xlabel('$^{{{206}}}Pb*$' + '$/^{{{238}}}U$' )
-
-    # Make an axis that shows units of Ma
-    ax2 = ax.twiny()
-    mn, mx = ax.get_xlim()
-    ax2.set_xlim(ratio_to_age68(mn)/1e6, ratio_to_age68(mx)/1e6)
-    ax2.set_xlabel('Age (Ma)')
+    ax.set_xlabel('Age (Ma)')
 
     # Create a smaller subplot to show the distribution of Pb loss in the sample
     ax_sub = ax.inset_axes([0.7, 0.15, 0.27, 0.3], transform=ax.transAxes)
@@ -579,73 +537,3 @@ def plot_Pb_loss_model_poly(norm_Ma_pdf, conv_Ma_pdf, params_Pb_loss, fit, dates
     ax_sub.set_xlabel('Pb loss (%)')
 
     return fig
-
-def ratio_to_age68(Pb206_U238, lam238 = 1.5512e-10):
-    return 1/lam238*np.log(Pb206_U238+1)
-
-def age_to_ratio68(age68, lam238 = 1.5512e-10):
-    return np.exp(lam238*age68)-1
-
-def ratio_to_age75(Pb207_U235, lam235 = 9.8485e-10):
-    return 1/lam235*np.log(Pb207_U235+1)
-
-def age_to_ratio75(age75, lam235 = 9.8485e-10):
-    return np.exp(lam235*age75)-1
-
-def age_to_ratio67(age76, lam238 = 1.5512e-10, lam235 = 9.8485e-10):
-    return 137.82*((np.exp(lam238*age76)-1)/(np.exp(lam235*age76)-1))
-
-def plot_concordia(ax, ages_line, ages_points, line_color='black', marker_color='white'):
-    ax.plot([age_to_ratio75(x) for x in ages_line],
-             [age_to_ratio68(x) for x in ages_line], '-', color=line_color)
-    ax.plot([age_to_ratio75(x) for x in ages_points],
-             [age_to_ratio68(x) for x in ages_points], 'o', markerfacecolor=marker_color,
-           markeredgecolor='black')
-    return ax
-
-def Pb_loss_ppm(array, Pb_loss):
-    '''
-    Parameters
-    ----------
-    array : array, amount of Pb in each timestep due to radioactive decay
-    Pb_loss : array, % of Pb loss in each timestep
-    '''
-    incr = np.insert(np.array([array[x+1]-array[x] for x in range(len(array)-1)]), 0, array[0])
-    new_amount_added = np.zeros_like(incr)
-    for i in range(len(incr)):
-        if i == 0:
-            reduction_amount = (Pb_loss[i] / 100.) * incr[i]
-            new_amount_added[i] = incr[i] - reduction_amount
-        else:
-            reduction_amount = (Pb_loss[i] / 100.) * (np.sum(new_amount_added[:(i)]) + incr[i])
-            new_amount_added[i] = incr[i] - reduction_amount
-    return np.cumsum(new_amount_added)
-
-def U_Pb_decay(age, xdif=1e6, U_ppm=1000):
-    '''
-    Returns concentrations of U238, U235, Pb206, and Pb207 for a given age and starting concentration of U
-    
-    Parameters
-    ----------
-    age : units of yr
-    xdif : discretization interval, yr
-    U_ppm : starting U, ppm
-    
-    '''
-    # Assumed constants
-    U238_U235 = 137.8180
-    lam238 = 1.5512e-10
-    lam235 = 9.8485e-10
-
-    x_age = np.arange(0,age+xdif,xdif) # Units yr
-    
-    U238_ppm_i = U_ppm-U_ppm*(1/U238_U235) # Initial normalized concentration
-    U235_ppm_i = U_ppm*(1/U238_U235) # Initial normalized concentration
-    
-    Pb206_ppm = U238_ppm_i*(1-np.exp(-lam238*x_age)) # Decay equation
-    U238_ppm = U238_ppm_i-Pb206_ppm
-
-    Pb207_ppm = U235_ppm_i*(1-np.exp(-lam235*x_age)) # Decay equation
-    U235_ppm = U235_ppm_i-Pb207_ppm    
-        
-    return U238_ppm, U235_ppm, Pb206_ppm, Pb207_ppm
